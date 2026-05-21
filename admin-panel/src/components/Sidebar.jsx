@@ -44,7 +44,7 @@ const navItems = [
   },
 ]
 
-export default function Sidebar({ session }) {
+export default function Sidebar({ session, isOpen, onClose }) {
   const navigate = useNavigate()
 
   async function handleLogout() {
@@ -52,11 +52,22 @@ export default function Sidebar({ session }) {
     navigate('/login')
   }
 
-  const activeClass = 'bg-accent/10 text-accent border border-accent/20'
+  const activeClass   = 'bg-accent/10 text-accent border border-accent/20'
   const inactiveClass = 'text-muted hover:text-agtext hover:bg-white/5 border border-transparent'
 
   return (
-    <aside className="w-56 flex-shrink-0 bg-surface border-r border-white/10 flex flex-col sticky top-0 h-screen">
+    <aside
+      className={[
+        // Base — sempre presente
+        'fixed inset-y-0 left-0 z-50 w-56',
+        'bg-surface border-r border-white/10 flex flex-col',
+        'transition-transform duration-300 ease-in-out',
+        // Mobile: abre/fecha via translate
+        isOpen ? 'translate-x-0' : '-translate-x-full',
+        // Desktop (md+): sempre visível, posição sticky normal
+        'md:relative md:translate-x-0 md:flex-shrink-0 md:sticky md:top-0 md:h-screen md:z-auto',
+      ].join(' ')}
+    >
       <Logo />
 
       <nav className="flex-1 px-3 py-4 space-y-1">
@@ -65,6 +76,7 @@ export default function Sidebar({ session }) {
             key={to}
             to={to}
             end={end}
+            onClick={onClose}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? activeClass : inactiveClass}`
             }
