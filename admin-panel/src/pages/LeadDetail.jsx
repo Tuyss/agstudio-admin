@@ -184,6 +184,9 @@ export default function LeadDetail() {
             onClick={() => {
               const numero = lead.whatsapp.replace(/\D/g, '')
               const msg = `Olá ${lead.nome}! Aqui é o ${sellerName} da AGStudio.tech 👋 Recebemos seu formulário e vi que você quer ${lead.objetivo || 'melhorar sua presença digital'} para ${lead.segmento || 'seu negócio'}. Já analisei seu caso e o ${lead.plano_interesse || 'nosso plano'} seria o caminho certo pra você. Quando tiver um tempinho me fala que te mostro exatamente o que a gente vai fazer pelo seu negócio 🚀`
+              console.log('numero:', numero)
+              console.log('msg:', msg)
+              console.log('url:', 'https://wa.me/55' + numero + '?text=' + encodeURIComponent(msg))
               window.open('https://wa.me/55' + numero + '?text=' + encodeURIComponent(msg), '_blank')
             }}
             className="btn-primary flex items-center gap-2"
