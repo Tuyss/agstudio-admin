@@ -4,6 +4,12 @@ import { supabase } from '../lib/supabase'
 
 const STATUSES = ['Novo', 'Contatado', 'Proposta Enviada', 'Fechado', 'Perdido']
 
+const SELLER_NAMES = {
+  'arthurcolinas19@gmail.com': 'Arthur',
+  'gregory.bsns@gmail.com':    'Gregory',
+  'gustavopp2906@gmail.com':   'Gustavo',
+}
+
 const STATUS_STYLE = {
   Novo:              { bg: 'rgba(77,159,255,0.12)',  color: '#4d9fff', border: 'rgba(77,159,255,0.3)' },
   Contatado:         { bg: 'rgba(126,200,255,0.12)', color: '#7ec8ff', border: 'rgba(126,200,255,0.3)' },
@@ -33,6 +39,7 @@ export default function LeadDetail() {
   const { id } = useParams()
   const [lead, setLead]         = useState(null)
   const [notas, setNotas]       = useState([])
+  const [sellerName, setSeller] = useState('')
   const [loadingLead, setLL]    = useState(true)
   const [savingStatus, setSS]   = useState(false)
   const [newNota, setNewNota]   = useState('')
@@ -40,12 +47,15 @@ export default function LeadDetail() {
 
   useEffect(() => {
     async function load() {
-      const [{ data: l }, { data: n }] = await Promise.all([
+      const [{ data: l }, { data: n }, { data: sessionData }] = await Promise.all([
         supabase.from('leads').select('*').eq('id', id).single(),
         supabase.from('lead_notas').select('*').eq('lead_id', id).order('criado_em', { ascending: false }),
+        supabase.auth.getSession(),
       ])
       setLead(l)
       setNotas(n ?? [])
+      const email = sessionData?.session?.user?.email ?? ''
+      setSeller(SELLER_NAMES[email] ?? 'AGStudio')
       setLL(false)
     }
     load()
@@ -171,7 +181,16 @@ export default function LeadDetail() {
         {/* Quick action buttons */}
         <div className="flex flex-wrap gap-3 mt-6 pt-6 border-t border-white/10">
           <a
-            href={`https://wa.me/55${lead.whatsapp.replace(/\D/g,'')}`}
+            href={(() => {
+              const numero = lead.whatsapp.replace(/\D/g, '')
+              const msg =
+                `Olá ${lead.nome}! Aqui é o ${sellerName} da AGStudio.tech, ` +
+                `Recebemos seu formulário e vi que você quer ${lead.objetivo || 'melhorar sua presença digital'} ` +
+                `para ${lead.segmento || 'seu negócio'}. ` +
+                `Já analisei seu caso e o ${lead.plano_interesse || 'nosso plano'} seria o caminho certo pra você. ` +
+                `Quando tiver um tempinho me fala que te mostro exatamente o que a gente vai fazer pelo seu negócio. 🚀`
+              return `https://wa.me/55${numero}?text=${encodeURIComponent(msg)}`
+            })()}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-primary flex items-center gap-2"
