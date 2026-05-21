@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 const navItems = [
@@ -33,22 +34,23 @@ const navItems = [
 const activeClass   = 'bg-accent/10 text-accent border border-accent/20'
 const inactiveClass = 'text-muted hover:text-agtext hover:bg-white/5 border border-transparent'
 
+// Conteúdo compartilhado entre mobile e desktop
 function SidebarContent({ session, onClose, onLogout }) {
   return (
     <>
-      <div className="flex items-center gap-2.5 px-6 py-5 border-b border-white/10 flex-shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent2 to-accent flex items-center justify-center flex-shrink-0">
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '20px 24px', borderBottom: '1px solid rgba(100,160,255,0.1)', flexShrink: 0 }}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg,#1a6fd4,#4d9fff)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
           </svg>
         </div>
         <div>
-          <span className="font-bold text-agtext text-sm">AGStudio</span>
-          <span className="block text-xs text-muted leading-none">Admin</span>
+          <span style={{ fontWeight: 700, color: '#e8f0ff', fontSize: 14 }}>AGStudio</span>
+          <span style={{ display: 'block', fontSize: 11, color: '#7a9ac0', lineHeight: 1 }}>Admin</span>
         </div>
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <nav style={{ flex: 1, padding: '16px 12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
         {navItems.map(({ to, end, label, icon }) => (
           <NavLink
             key={to}
@@ -65,10 +67,12 @@ function SidebarContent({ session, onClose, onLogout }) {
         ))}
       </nav>
 
-      <div className="px-3 py-4 border-t border-white/10 space-y-3 flex-shrink-0">
+      <div style={{ padding: '16px 12px', borderTop: '1px solid rgba(100,160,255,0.1)', display: 'flex', flexDirection: 'column', gap: 12, flexShrink: 0 }}>
         {session?.user && (
-          <div className="px-3 py-2 rounded-xl bg-white/5">
-            <p className="text-xs text-muted truncate">{session.user.email}</p>
+          <div style={{ padding: '8px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.05)' }}>
+            <p style={{ fontSize: 12, color: '#7a9ac0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {session.user.email}
+            </p>
           </div>
         )}
         <button
@@ -87,65 +91,74 @@ function SidebarContent({ session, onClose, onLogout }) {
   )
 }
 
+const DESKTOP_BREAKPOINT = 768
+
 export default function Sidebar({ session, isOpen, onClose }) {
   const navigate = useNavigate()
+  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= DESKTOP_BREAKPOINT)
+
+  useEffect(() => {
+    function handleResize() {
+      setIsDesktop(window.innerWidth >= DESKTOP_BREAKPOINT)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   async function handleLogout() {
     await supabase.auth.signOut()
     navigate('/login')
   }
 
-  return (
-    <>
-      {/* ── MOBILE (< 768px) ───────────────────────────────────────────
-          Overlay fixed que cobre tudo. Painel desliza da esquerda.
-          Usa style inline para o transform — sem risco de purge Tailwind. */}
-      <div
-        className="md:hidden"
-        style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 50,
-          pointerEvents: isOpen ? 'auto' : 'none',
-        }}
-      >
-        {/* Backdrop escuro */}
-        <div
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'rgba(0,0,0,0.6)',
-            opacity: isOpen ? 1 : 0,
-            transition: 'opacity 0.3s ease',
-          }}
-        />
-
-        {/* Painel lateral */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            bottom: 0,
-            width: '14rem',
-            display: 'flex',
-            flexDirection: 'column',
-            background: '#0e1e36',
-            borderRight: '1px solid rgba(100,160,255,0.1)',
-            transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
-            transition: 'transform 0.3s ease',
-          }}
-        >
-          <SidebarContent session={session} onClose={onClose} onLogout={handleLogout} />
-        </div>
-      </div>
-
-      {/* ── DESKTOP (≥ 768px) ──────────────────────────────────────────
-          Sidebar estático no fluxo normal do flex. Nunca aparece no mobile. */}
-      <aside className="hidden md:flex flex-col w-56 flex-shrink-0 sticky top-0 h-screen bg-surface border-r border-white/10">
+  // ── DESKTOP: sidebar estático no fluxo do flex ──────────────────
+  if (isDesktop) {
+    return (
+      <aside style={{
+        width: 224,
+        flexShrink: 0,
+        position: 'sticky',
+        top: 0,
+        height: '100vh',
+        background: '#0e1e36',
+        borderRight: '1px solid rgba(100,160,255,0.1)',
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
         <SidebarContent session={session} onClose={onClose} onLogout={handleLogout} />
       </aside>
-    </>
+    )
+  }
+
+  // ── MOBILE: overlay deslizante ──────────────────────────────────
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 50, pointerEvents: isOpen ? 'auto' : 'none' }}>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(0,0,0,0.65)',
+          opacity: isOpen ? 1 : 0,
+          transition: 'opacity 0.3s ease',
+        }}
+      />
+      {/* Painel */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        bottom: 0,
+        width: 224,
+        display: 'flex',
+        flexDirection: 'column',
+        background: '#0e1e36',
+        borderRight: '1px solid rgba(100,160,255,0.1)',
+        transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
+        transition: 'transform 0.3s ease',
+      }}>
+        <SidebarContent session={session} onClose={onClose} onLogout={handleLogout} />
+      </div>
+    </div>
   )
 }
