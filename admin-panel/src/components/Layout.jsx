@@ -7,23 +7,15 @@ export default function Layout({ session }) {
 
   return (
     <div className="flex min-h-screen bg-black">
-
-      {/* Overlay mobile — escurece o fundo e fecha o sidebar ao clicar */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 z-40 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
       <Sidebar
         session={session}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
 
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar mobile com botão hambúrguer */}
+      {/* Área de conteúdo — ocupa 100% no mobile, resto no desktop */}
+      <div className="flex-1 flex flex-col min-w-0 w-0">
+        {/* Top bar — só aparece no mobile */}
         <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-surface border-b border-white/10 sticky top-0 z-30">
           <button
             onClick={() => setSidebarOpen(true)}
@@ -50,7 +42,6 @@ export default function Layout({ session }) {
           <Outlet />
         </main>
       </div>
-
     </div>
   )
 }
