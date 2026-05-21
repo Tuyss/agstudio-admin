@@ -162,7 +162,7 @@ export default function LeadDetail() {
           <InfoRow label="Objetivo"       value={lead.objetivo} />
           <InfoRow label="Canal"          value={lead.canal} />
           <InfoRow label="Plano"          value={lead.plano_interesse} />
-          <InfoRow label="Automação"      value={lead.automacao_interesse || 'Não informado'} />
+          <InfoRow label="Automação de interesse" value={lead.automacao_interesse || 'Não informado'} />
           <InfoRow label="Criado em"      value={fmtDateTime(lead.data_criacao)} />
           <InfoRow label="Atualizado em"  value={fmtDateTime(lead.data_atualizacao)} />
         </div>
@@ -184,10 +184,24 @@ export default function LeadDetail() {
           <button
             onClick={() => {
               const numero = lead.whatsapp.replace(/\D/g, '')
-              const msg = `Olá ${lead.nome}! Aqui é o ${sellerName} da AGStudio.tech 👋 Recebemos seu formulário e vi que você quer ${lead.objetivo || 'melhorar sua presença digital'} para ${lead.segmento || 'seu negócio'}. Já analisei seu caso e o ${lead.plano_interesse || 'nosso plano'} seria o caminho certo pra você. Quando tiver um tempinho me fala que te mostro exatamente o que a gente vai fazer pelo seu negócio 🚀`
-              console.log('numero:', numero)
-              console.log('msg:', msg)
-              console.log('url:', 'https://wa.me/55' + numero + '?text=' + encodeURIComponent(msg))
+              const auto   = lead.automacao_interesse
+              const plano  = lead.plano_interesse || 'nosso plano'
+
+              let msg
+              if (!auto) {
+                // Sem automação → foco no site
+                msg = `Olá ${lead.nome}! Aqui é o ${sellerName} da AGStudio.tech 👋 Recebemos seu formulário e vi que você quer ${lead.objetivo || 'melhorar sua presença digital'} para ${lead.segmento || 'seu negócio'}. Já analisei seu caso e o ${plano} seria o caminho certo pra você. Quando tiver um tempinho me fala que te mostro exatamente o que a gente vai fazer pelo seu negócio 🚀`
+              } else if (auto === 'Chatbot Padrão') {
+                // Interesse em chatbot
+                msg = `Olá ${lead.nome}, tudo bem? Aqui é da AGStudio, meu nome é ${sellerName}. Recebemos seu formulário e vi que você tem interesse no ${plano} e também no ${auto}. Adoraria conversar sobre como podemos automatizar o atendimento do seu negócio com um chatbot inteligente. Quando seria um bom momento para conversarmos?`
+              } else if (auto === 'Combo CRM + Chatbot') {
+                // Interesse em CRM + Chatbot
+                msg = `Olá ${lead.nome}, tudo bem? Aqui é da AGStudio, meu nome é ${sellerName}. Recebemos seu formulário e vi que você tem interesse no ${plano} e também no ${auto}. Adoraria conversar sobre como podemos automatizar tanto o atendimento quanto a gestão de clientes do seu negócio. Quando seria um bom momento para conversarmos?`
+              } else {
+                // CRM Essencial ou CRM Avançado
+                msg = `Olá ${lead.nome}, tudo bem? Aqui é da AGStudio, meu nome é ${sellerName}. Recebemos seu formulário e vi que você tem interesse no ${plano} e também no ${auto}. Adoraria conversar sobre como podemos automatizar a gestão de clientes do seu negócio. Quando seria um bom momento para conversarmos?`
+              }
+
               window.open('https://wa.me/55' + numero + '?text=' + encodeURIComponent(msg), '_blank')
             }}
             className="btn-primary flex items-center gap-2"
