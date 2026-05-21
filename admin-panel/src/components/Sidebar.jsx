@@ -1,20 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
-const Logo = () => (
-  <div className="flex items-center gap-2.5 px-6 py-5 border-b border-white/10">
-    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent2 to-accent flex items-center justify-center flex-shrink-0">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-      </svg>
-    </div>
-    <div>
-      <span className="font-bold text-agtext text-sm">AGStudio</span>
-      <span className="block text-xs text-muted leading-none">Admin</span>
-    </div>
-  </div>
-)
-
 const navItems = [
   {
     to: '/',
@@ -44,33 +30,28 @@ const navItems = [
   },
 ]
 
-export default function Sidebar({ session, isOpen, onClose }) {
-  const navigate = useNavigate()
+const activeClass   = 'bg-accent/10 text-accent border border-accent/20'
+const inactiveClass = 'text-muted hover:text-agtext hover:bg-white/5 border border-transparent'
 
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    navigate('/login')
-  }
-
-  const activeClass   = 'bg-accent/10 text-accent border border-accent/20'
-  const inactiveClass = 'text-muted hover:text-agtext hover:bg-white/5 border border-transparent'
-
+// Conteúdo interno do sidebar — reutilizado nos dois renders
+function SidebarContent({ session, onClose, onLogout }) {
   return (
-    <aside
-      className={[
-        // Base — sempre presente
-        'fixed inset-y-0 left-0 z-50 w-56',
-        'bg-surface border-r border-white/10 flex flex-col',
-        'transition-transform duration-300 ease-in-out',
-        // Mobile: abre/fecha via translate
-        isOpen ? 'translate-x-0' : '-translate-x-full',
-        // Desktop (md+): sempre visível, posição sticky normal
-        'md:relative md:translate-x-0 md:flex-shrink-0 md:sticky md:top-0 md:h-screen md:z-auto',
-      ].join(' ')}
-    >
-      <Logo />
+    <>
+      {/* Logo */}
+      <div className="flex items-center gap-2.5 px-6 py-5 border-b border-white/10 flex-shrink-0">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent2 to-accent flex items-center justify-center flex-shrink-0">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          </svg>
+        </div>
+        <div>
+          <span className="font-bold text-agtext text-sm">AGStudio</span>
+          <span className="block text-xs text-muted leading-none">Admin</span>
+        </div>
+      </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      {/* Nav */}
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {navItems.map(({ to, end, label, icon }) => (
           <NavLink
             key={to}
@@ -87,14 +68,15 @@ export default function Sidebar({ session, isOpen, onClose }) {
         ))}
       </nav>
 
-      <div className="px-3 py-4 border-t border-white/10 space-y-3">
+      {/* Footer */}
+      <div className="px-3 py-4 border-t border-white/10 space-y-3 flex-shrink-0">
         {session?.user && (
           <div className="px-3 py-2 rounded-xl bg-white/5">
             <p className="text-xs text-muted truncate">{session.user.email}</p>
           </div>
         )}
         <button
-          onClick={handleLogout}
+          onClick={onLogout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-muted hover:text-red-400 hover:bg-red-400/10 border border-transparent transition-all"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -105,6 +87,45 @@ export default function Sidebar({ session, isOpen, onClose }) {
           Sair
         </button>
       </div>
-    </aside>
+    </>
+  )
+}
+
+export default function Sidebar({ session, isOpen, onClose }) {
+  const navigate = useNavigate()
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    navigate('/login')
+  }
+
+  return (
+    <>
+      {/*
+        MOBILE — overlay drawer (fixed, fora do fluxo, não empurra nada)
+        Visível apenas em telas < md. Controlado por isOpen.
+      */}
+      <div className={`md:hidden fixed inset-0 z-50 ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+        {/* Backdrop escuro */}
+        <div
+          className={`absolute inset-0 bg-black/60 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
+          onClick={onClose}
+        />
+        {/* Painel deslizante */}
+        <div
+          className={`absolute inset-y-0 left-0 flex flex-col w-56 bg-surface border-r border-white/10 transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        >
+          <SidebarContent session={session} onClose={onClose} onLogout={handleLogout} />
+        </div>
+      </div>
+
+      {/*
+        DESKTOP — sidebar estático no fluxo normal (md+)
+        Sempre visível, sticky na lateral. Nunca aparece no mobile.
+      */}
+      <aside className="hidden md:flex flex-col w-56 flex-shrink-0 sticky top-0 h-screen bg-surface border-r border-white/10">
+        <SidebarContent session={session} onClose={onClose} onLogout={handleLogout} />
+      </aside>
+    </>
   )
 }
