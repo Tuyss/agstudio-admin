@@ -2,8 +2,9 @@ import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
-const STATUSES = ['Novo', 'Contatado', 'Proposta Enviada', 'Fechado', 'Perdido']
-const PLANOS   = ['Básico', 'Intermediário', 'Super']
+const STATUSES   = ['Novo', 'Contatado', 'Proposta Enviada', 'Fechado', 'Perdido']
+const PLANOS     = ['Básico', 'Intermediário', 'Super']
+const AUTOMACOES = ['CRM Essencial', 'CRM Avançado', 'Chatbot Padrão', 'Combo CRM + Chatbot']
 
 const STATUS_STYLE = {
   Novo:              { bg: 'rgba(77,159,255,0.12)',  color: '#4d9fff', border: 'rgba(77,159,255,0.3)' },
@@ -81,6 +82,7 @@ export default function Leads() {
   const [search, setSearch]     = useState('')
   const [filterStatus, setFS]   = useState('')
   const [filterPlano, setFP]    = useState('')
+  const [filterAuto, setFA]     = useState('')
   const [filterFrom, setFrom]   = useState('')
   const [filterTo, setTo]       = useState('')
 
@@ -89,12 +91,13 @@ export default function Leads() {
     let q = supabase.from('leads').select('*').order('data_criacao', { ascending: false })
     if (filterStatus) q = q.eq('status', filterStatus)
     if (filterPlano)  q = q.eq('plano_interesse', filterPlano)
+    if (filterAuto)   q = q.eq('automacao_interesse', filterAuto)
     if (filterFrom)   q = q.gte('data_criacao', filterFrom)
     if (filterTo)     q = q.lte('data_criacao', filterTo + 'T23:59:59')
     const { data, error } = await q
     if (!error) setLeads(data ?? [])
     setLoading(false)
-  }, [filterStatus, filterPlano, filterFrom, filterTo])
+  }, [filterStatus, filterPlano, filterAuto, filterFrom, filterTo])
 
   useEffect(() => { fetchLeads() }, [fetchLeads])
 
@@ -137,6 +140,10 @@ export default function Leads() {
           <option value="">Todos os planos</option>
           {PLANOS.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
+        <select value={filterAuto} onChange={e => setFA(e.target.value)} className="select w-48">
+          <option value="">Todas as automações</option>
+          {AUTOMACOES.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
         <input
           type="date"
           value={filterFrom}
@@ -151,9 +158,9 @@ export default function Leads() {
           className="input w-40"
           title="Até"
         />
-        {(filterStatus || filterPlano || filterFrom || filterTo) && (
+        {(filterStatus || filterPlano || filterAuto || filterFrom || filterTo) && (
           <button
-            onClick={() => { setFS(''); setFP(''); setFrom(''); setTo('') }}
+            onClick={() => { setFS(''); setFP(''); setFA(''); setFrom(''); setTo('') }}
             className="btn-ghost"
           >
             Limpar filtros
