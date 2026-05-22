@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const STATUSES = ['Novo', 'Contatado', 'Proposta Enviada', 'Fechado', 'Perdido']
@@ -16,6 +16,10 @@ const STATUS_STYLE = {
   'Proposta Enviada':{ bg: 'rgba(168,212,255,0.12)', color: '#a8d4ff', border: 'rgba(168,212,255,0.3)' },
   Fechado:           { bg: 'rgba(74,222,128,0.12)',  color: '#4ade80', border: 'rgba(74,222,128,0.3)' },
   Perdido:           { bg: 'rgba(248,113,113,0.12)', color: '#f87171', border: 'rgba(248,113,113,0.3)' },
+}
+
+function fmtBRL(v) {
+  return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
 function InfoRow({ label, value }) {
@@ -36,7 +40,9 @@ function fmtDateTime(iso) {
 }
 
 export default function LeadDetail() {
-  const { id } = useParams()
+  const { id }       = useParams()
+  const navigate     = useNavigate()
+
   const [lead, setLead]         = useState(null)
   const [notas, setNotas]       = useState([])
   const [sellerName, setSeller] = useState('')
@@ -44,6 +50,9 @@ export default function LeadDetail() {
   const [savingStatus, setSS]   = useState(false)
   const [newNota, setNewNota]   = useState('')
   const [savingNota, setSN]     = useState(false)
+  const [valor, setValor]       = useState('')
+  const [savingValor, setSV]    = useState(false)
+  const [deleting, setDel]      = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -54,6 +63,7 @@ export default function LeadDetail() {
       ])
       setLead(l)
       setNotas(n ?? [])
+      if (l?.valor_venda != null) setValor(String(l.valor_venda))
       const email = sessionData?.session?.user?.email ?? ''
       setSeller(SELLER_NAMES[email] ?? 'AGStudio')
       setLL(false)
@@ -67,6 +77,26 @@ export default function LeadDetail() {
     const { error } = await supabase.from('leads').update({ status: next }).eq('id', id)
     if (!error) setLead(prev => ({ ...prev, status: next }))
     setSS(false)
+  }
+
+  async function handleSaveValor() {
+    setSV(true)
+    const raw = valor.replace(',', '.').replace(/[^0-9.]/g, '')
+    const v   = parseFloat(raw)
+    const { error } = await supabase
+      .from('leads')
+      .update({ valor_venda: isNaN(v) ? null : v })
+      .eq('id', id)
+    if (!error) setLead(prev => ({ ...prev, valor_venda: isNaN(v) ? null : v }))
+    setSV(false)
+  }
+
+  async function handleDelete() {
+    if (!window.confirm(`Excluir o lead "${lead?.nome}" permanentemente? Esta ação não pode ser desfeita.`)) return
+    setDel(true)
+    await supabase.from('lead_notas').delete().eq('lead_id', id)
+    await supabase.from('leads').delete().eq('id', id)
+    navigate('/leads')
   }
 
   async function handleAddNota(e) {
@@ -127,7 +157,7 @@ export default function LeadDetail() {
           <h1 className="text-2xl font-bold text-agtext tracking-tight">{lead.nome}</h1>
           <p className="text-muted text-sm mt-0.5">Cadastrado em {fmtDateTime(lead.data_criacao)}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <span className="text-xs text-muted hidden sm:block">Status:</span>
           <div className="relative">
             <select
@@ -143,6 +173,18 @@ export default function LeadDetail() {
               <path d="M6 9l6 6 6-6"/>
             </svg>
           </div>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-red-400 hover:bg-red-400/10 border border-red-400/20 transition-all disabled:opacity-60"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6M14 11v6"/>
+            </svg>
+            {deleting ? 'Excluindo...' : 'Excluir'}
+          </button>
         </div>
       </div>
 
@@ -163,11 +205,17 @@ export default function LeadDetail() {
           <InfoRow label="Canal"      value={lead.canal} />
           <InfoRow label="Plano"      value={lead.plano_interesse} />
           <InfoRow label="Automação"  value={lead.automacao_interesse || 'Não informado'} />
-          <InfoRow label="Criado em"  value={fmtDateTime(lead.data_criacao)} />
+          {lead.valor_venda != null && (
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-muted uppercase tracking-widest">Valor vendido</span>
+              <span className="text-sm font-semibold text-emerald-400">{fmtBRL(lead.valor_venda)}</span>
+            </div>
+          )}
+          <InfoRow label="Criado em"     value={fmtDateTime(lead.data_criacao)} />
           <InfoRow label="Atualizado em" value={fmtDateTime(lead.data_atualizacao)} />
         </div>
 
-        {/* Notas do cliente (preenchidas no formulário) */}
+        {/* Observações do formulário */}
         {lead.notas && (
           <div className="mt-6 pt-6 border-t border-white/10">
             <span className="block text-xs font-semibold text-muted uppercase tracking-widest mb-2">
@@ -179,7 +227,40 @@ export default function LeadDetail() {
           </div>
         )}
 
-        {/* Quick action buttons */}
+        {/* Venda fechada — registrar valor */}
+        {lead.status === 'Fechado' && (
+          <div className="mt-6 pt-6 border-t border-emerald-500/20">
+            <div className="flex items-center gap-2 mb-4">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2">
+                <line x1="12" y1="1" x2="12" y2="23"/>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+              <span className="text-sm font-semibold text-emerald-400">Venda Fechada — Registrar Valor</span>
+            </div>
+            <div className="flex gap-3 items-center">
+              <div className="relative max-w-[200px]">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm font-medium">R$</span>
+                <input
+                  type="text"
+                  value={valor}
+                  onChange={e => setValor(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSaveValor()}
+                  placeholder="0,00"
+                  className="input pl-9"
+                />
+              </div>
+              <button
+                onClick={handleSaveValor}
+                disabled={savingValor}
+                className="btn-primary"
+              >
+                {savingValor ? 'Salvando...' : 'Salvar valor'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Quick actions */}
         <div className="flex flex-wrap gap-3 mt-6 pt-6 border-t border-white/10">
           <button
             onClick={() => {
@@ -229,7 +310,6 @@ export default function LeadDetail() {
           Histórico de Anotações
         </h2>
 
-        {/* Add note */}
         <form onSubmit={handleAddNota} className="mb-6">
           <textarea
             value={newNota}
@@ -259,7 +339,6 @@ export default function LeadDetail() {
           </button>
         </form>
 
-        {/* Notes list */}
         {notas.length === 0 && (
           <p className="text-muted text-sm text-center py-8 border border-dashed border-white/10 rounded-xl">
             Nenhuma anotação ainda. Adicione a primeira acima.

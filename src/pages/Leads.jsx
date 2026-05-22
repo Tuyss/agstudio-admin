@@ -2,8 +2,9 @@ import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
-const STATUSES = ['Novo', 'Contatado', 'Proposta Enviada', 'Fechado', 'Perdido']
-const PLANOS   = ['Básico', 'Intermediário', 'Super']
+const STATUSES   = ['Novo', 'Contatado', 'Proposta Enviada', 'Fechado', 'Perdido']
+const PLANOS     = ['Básico', 'Intermediário', 'Super']
+const AUTOMACOES = ['CRM Essencial', 'CRM Avançado', 'Chatbot Padrão', 'Combo CRM + Chatbot']
 
 const STATUS_STYLE = {
   Novo:              { bg: 'rgba(77,159,255,0.12)',  color: '#4d9fff', border: 'rgba(77,159,255,0.3)' },
@@ -26,9 +27,9 @@ function StatusBadge({ status }) {
 }
 
 function InlineStatusSelect({ leadId, current, onUpdated }) {
-  const [editing, setEditing]   = useState(false)
-  const [saving, setSaving]     = useState(false)
-  const [value, setValue]       = useState(current)
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving]   = useState(false)
+  const [value, setValue]     = useState(current)
 
   async function handleChange(e) {
     const next = e.target.value
@@ -76,25 +77,27 @@ function fmtDate(iso) {
 }
 
 export default function Leads() {
-  const [leads, setLeads]       = useState([])
-  const [loading, setLoading]   = useState(true)
-  const [search, setSearch]     = useState('')
-  const [filterStatus, setFS]   = useState('')
-  const [filterPlano, setFP]    = useState('')
-  const [filterFrom, setFrom]   = useState('')
-  const [filterTo, setTo]       = useState('')
+  const [leads, setLeads]     = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch]   = useState('')
+  const [filterStatus, setFS] = useState('')
+  const [filterPlano, setFP]  = useState('')
+  const [filterAuto, setFA]   = useState('')
+  const [filterFrom, setFrom] = useState('')
+  const [filterTo, setTo]     = useState('')
 
   const fetchLeads = useCallback(async () => {
     setLoading(true)
     let q = supabase.from('leads').select('*').order('data_criacao', { ascending: false })
     if (filterStatus) q = q.eq('status', filterStatus)
     if (filterPlano)  q = q.eq('plano_interesse', filterPlano)
+    if (filterAuto)   q = q.eq('automacao_interesse', filterAuto)
     if (filterFrom)   q = q.gte('data_criacao', filterFrom)
     if (filterTo)     q = q.lte('data_criacao', filterTo + 'T23:59:59')
     const { data, error } = await q
     if (!error) setLeads(data ?? [])
     setLoading(false)
-  }, [filterStatus, filterPlano, filterFrom, filterTo])
+  }, [filterStatus, filterPlano, filterAuto, filterFrom, filterTo])
 
   useEffect(() => { fetchLeads() }, [fetchLeads])
 
@@ -110,6 +113,8 @@ export default function Leads() {
         (l.segmento || '').toLowerCase().includes(search.toLowerCase())
       )
     : leads
+
+  const hasFilter = filterStatus || filterPlano || filterAuto || filterFrom || filterTo
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -137,23 +142,15 @@ export default function Leads() {
           <option value="">Todos os planos</option>
           {PLANOS.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
-        <input
-          type="date"
-          value={filterFrom}
-          onChange={e => setFrom(e.target.value)}
-          className="input w-40"
-          title="De"
-        />
-        <input
-          type="date"
-          value={filterTo}
-          onChange={e => setTo(e.target.value)}
-          className="input w-40"
-          title="Até"
-        />
-        {(filterStatus || filterPlano || filterFrom || filterTo) && (
+        <select value={filterAuto} onChange={e => setFA(e.target.value)} className="select w-48">
+          <option value="">Todas as automações</option>
+          {AUTOMACOES.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+        <input type="date" value={filterFrom} onChange={e => setFrom(e.target.value)} className="input w-40" title="De" />
+        <input type="date" value={filterTo}   onChange={e => setTo(e.target.value)}   className="input w-40" title="Até" />
+        {hasFilter && (
           <button
-            onClick={() => { setFS(''); setFP(''); setFrom(''); setTo('') }}
+            onClick={() => { setFS(''); setFP(''); setFA(''); setFrom(''); setTo('') }}
             className="btn-ghost"
           >
             Limpar filtros
@@ -170,8 +167,8 @@ export default function Leads() {
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-muted uppercase tracking-widest">Nome</th>
                 <th className="text-left px-4 py-3.5 text-xs font-semibold text-muted uppercase tracking-widest">WhatsApp</th>
                 <th className="text-left px-4 py-3.5 text-xs font-semibold text-muted uppercase tracking-widest hidden md:table-cell">E-mail</th>
+                <th className="text-left px-4 py-3.5 text-xs font-semibold text-muted uppercase tracking-widest hidden md:table-cell">Plano</th>
                 <th className="text-left px-4 py-3.5 text-xs font-semibold text-muted uppercase tracking-widest hidden lg:table-cell">Segmento</th>
-                <th className="text-left px-4 py-3.5 text-xs font-semibold text-muted uppercase tracking-widest hidden lg:table-cell">Plano</th>
                 <th className="text-left px-4 py-3.5 text-xs font-semibold text-muted uppercase tracking-widest hidden xl:table-cell">Canal</th>
                 <th className="text-left px-4 py-3.5 text-xs font-semibold text-muted uppercase tracking-widest">Status</th>
                 <th className="text-left px-4 py-3.5 text-xs font-semibold text-muted uppercase tracking-widest hidden md:table-cell">Data</th>
@@ -205,14 +202,14 @@ export default function Leads() {
                   </td>
                   <td className="px-4 py-4 text-muted">{l.whatsapp}</td>
                   <td className="px-4 py-4 text-muted hidden md:table-cell max-w-[180px] truncate">{l.email}</td>
-                  <td className="px-4 py-4 text-muted hidden lg:table-cell max-w-[140px] truncate">{l.segmento || '—'}</td>
-                  <td className="px-4 py-4 hidden lg:table-cell">
+                  <td className="px-4 py-4 hidden md:table-cell">
                     {l.plano_interesse ? (
-                      <span className="text-xs font-medium text-accent bg-accent/10 px-2 py-0.5 rounded-md">
+                      <span className="text-xs font-semibold text-accent bg-accent/10 border border-accent/20 px-2.5 py-0.5 rounded-full">
                         {l.plano_interesse}
                       </span>
                     ) : <span className="text-muted">—</span>}
                   </td>
+                  <td className="px-4 py-4 text-muted hidden lg:table-cell max-w-[140px] truncate">{l.segmento || '—'}</td>
                   <td className="px-4 py-4 text-muted hidden xl:table-cell">{l.canal || '—'}</td>
                   <td className="px-4 py-4">
                     <InlineStatusSelect

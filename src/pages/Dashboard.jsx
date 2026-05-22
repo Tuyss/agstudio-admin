@@ -16,6 +16,10 @@ const STATUS_COLORS = {
 
 const PIE_COLORS = ['#4d9fff','#1a6fd4','#7ec8ff','#a8d4ff','#2563eb']
 
+function fmtBRL(v) {
+  return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
 function StatCard({ label, value, sub, icon, accent }) {
   return (
     <div className="card p-6 flex items-start gap-4">
@@ -25,9 +29,9 @@ function StatCard({ label, value, sub, icon, accent }) {
       >
         <span style={{ color: accent }}>{icon}</span>
       </div>
-      <div>
+      <div className="min-w-0">
         <p className="text-xs font-semibold text-muted uppercase tracking-widest mb-1">{label}</p>
-        <p className="text-3xl font-extrabold text-agtext tracking-tight">{value}</p>
+        <p className="text-2xl font-extrabold text-agtext tracking-tight truncate">{value}</p>
         {sub && <p className="text-xs text-muted mt-0.5">{sub}</p>}
       </div>
     </div>
@@ -54,6 +58,40 @@ const CustomPieTooltip = ({ active, payload }) => {
   )
 }
 
+// Render XAxis tick with word wrap for long names
+function CustomXTick({ x, y, payload }) {
+  const words = payload.value.split(' ')
+  const lines = []
+  let line = ''
+  words.forEach(w => {
+    if ((line + ' ' + w).trim().length > 12) {
+      if (line) lines.push(line)
+      line = w
+    } else {
+      line = (line + ' ' + w).trim()
+    }
+  })
+  if (line) lines.push(line)
+
+  return (
+    <g transform={`translate(${x},${y})`}>
+      {lines.map((l, i) => (
+        <text
+          key={i}
+          x={0}
+          y={0}
+          dy={12 + i * 13}
+          textAnchor="middle"
+          fill="#7a9ac0"
+          fontSize={11}
+        >
+          {l}
+        </text>
+      ))}
+    </g>
+  )
+}
+
 function startOfDay(d) {
   const x = new Date(d)
   x.setHours(0, 0, 0, 0)
@@ -68,7 +106,7 @@ export default function Dashboard() {
     async function fetchLeads() {
       const { data, error } = await supabase
         .from('leads')
-        .select('id,nome,whatsapp,plano_interesse,canal,status,data_criacao')
+        .select('id,nome,whatsapp,plano_interesse,canal,status,data_criacao,valor_venda')
         .order('data_criacao', { ascending: false })
 
       if (!error) setLeads(data ?? [])
@@ -79,14 +117,18 @@ export default function Dashboard() {
 
   const now = new Date()
   const todayStart = startOfDay(now)
-  const weekStart = new Date(now)
+  const weekStart  = new Date(now)
   weekStart.setDate(weekStart.getDate() - 7)
 
-  const total         = leads.length
-  const hoje          = leads.filter(l => new Date(l.data_criacao) >= todayStart).length
-  const semana        = leads.filter(l => new Date(l.data_criacao) >= weekStart).length
-  const fechados      = leads.filter(l => l.status === 'Fechado').length
+  const total          = leads.length
+  const hoje           = leads.filter(l => new Date(l.data_criacao) >= todayStart).length
+  const semana         = leads.filter(l => new Date(l.data_criacao) >= weekStart).length
+  const fechados       = leads.filter(l => l.status === 'Fechado').length
   const taxaFechamento = total > 0 ? ((fechados / total) * 100).toFixed(0) : 0
+
+  const vendasComValor = leads.filter(l => l.status === 'Fechado' && l.valor_venda != null)
+  const receitaTotal   = vendasComValor.reduce((s, l) => s + Number(l.valor_venda), 0)
+  const ticketMedio    = vendasComValor.length > 0 ? receitaTotal / vendasComValor.length : 0
 
   // Group by plano
   const planoMap = {}
@@ -128,11 +170,11 @@ export default function Dashboard() {
     <div className="p-8 max-w-7xl mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-agtext tracking-tight">Dashboard</h1>
-        <p className="text-muted text-sm mt-1">Visão geral dos seus leads</p>
+        <p className="text-muted text-sm mt-1">Visão geral dos seus leads e receita</p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {/* Stats — 6 cards em 2 colunas no mobile, 3 no desktop */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         <StatCard
           label="Total de leads"
           value={total}
@@ -142,7 +184,7 @@ export default function Dashboard() {
         <StatCard
           label="Hoje"
           value={hoje}
-          sub="leads nas últimas 24h"
+          sub="últimas 24h"
           icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>}
           accent="#7ec8ff"
         />
@@ -154,32 +196,53 @@ export default function Dashboard() {
           accent="#1a6fd4"
         />
         <StatCard
-          label="Fechados"
+          label="Taxa de fechamento"
           value={`${taxaFechamento}%`}
           sub={`${fechados} de ${total} leads`}
           icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>}
           accent="#4ade80"
         />
+        <StatCard
+          label="Receita total"
+          value={receitaTotal > 0 ? fmtBRL(receitaTotal) : 'R$ 0'}
+          sub={`${vendasComValor.length} venda${vendasComValor.length !== 1 ? 's' : ''} registrada${vendasComValor.length !== 1 ? 's' : ''}`}
+          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>}
+          accent="#4ade80"
+        />
+        <StatCard
+          label="Ticket médio"
+          value={ticketMedio > 0 ? fmtBRL(ticketMedio) : '—'}
+          sub="por venda fechada"
+          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>}
+          accent="#a8d4ff"
+        />
       </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Plano bar chart */}
+        {/* Plano bar chart — fixed label overflow */}
         <div className="card p-6">
           <h2 className="text-sm font-semibold text-agtext mb-1">Leads por Plano</h2>
           <p className="text-xs text-muted mb-5">Distribuição por plano de interesse</p>
           {planoData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={planoData} barSize={36}>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={planoData} barSize={32} margin={{ bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
-                <XAxis dataKey="name" tick={{ fill: '#7a9ac0', fontSize: 12 }} axisLine={false} tickLine={false} />
+                <XAxis
+                  dataKey="name"
+                  tick={<CustomXTick />}
+                  axisLine={false}
+                  tickLine={false}
+                  interval={0}
+                  height={55}
+                />
                 <YAxis tick={{ fill: '#7a9ac0', fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
                 <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(77,159,255,0.05)' }} />
                 <Bar dataKey="value" fill="#4d9fff" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[220px] flex items-center justify-center text-muted text-sm">
+            <div className="h-[240px] flex items-center justify-center text-muted text-sm">
               Nenhum dado ainda
             </div>
           )}
@@ -190,7 +253,7 @@ export default function Dashboard() {
           <h2 className="text-sm font-semibold text-agtext mb-1">Leads por Canal</h2>
           <p className="text-xs text-muted mb-5">De onde vieram seus leads</p>
           {canalData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={240}>
               <PieChart>
                 <Pie
                   data={canalData}
@@ -214,22 +277,22 @@ export default function Dashboard() {
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[220px] flex items-center justify-center text-muted text-sm">
+            <div className="h-[240px] flex items-center justify-center text-muted text-sm">
               Nenhum dado ainda
             </div>
           )}
         </div>
       </div>
 
-      {/* Status summary + Recent leads */}
+      {/* Funil + Recentes */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Status */}
+        {/* Status funil */}
         <div className="card p-6">
           <h2 className="text-sm font-semibold text-agtext mb-4">Status do Funil</h2>
           <div className="space-y-3">
             {['Novo','Contatado','Proposta Enviada','Fechado','Perdido'].map(s => {
               const count = statusMap[s] || 0
-              const pct = total > 0 ? (count / total) * 100 : 0
+              const pct   = total > 0 ? (count / total) * 100 : 0
               return (
                 <div key={s}>
                   <div className="flex justify-between items-center mb-1">
@@ -246,9 +309,30 @@ export default function Dashboard() {
               )
             })}
           </div>
+
+          {/* Mini receita por status */}
+          {vendasComValor.length > 0 && (
+            <div className="mt-5 pt-5 border-t border-white/10">
+              <p className="text-xs font-semibold text-muted uppercase tracking-widest mb-3">Receita</p>
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted">Total</span>
+                  <span className="font-semibold text-emerald-400">{fmtBRL(receitaTotal)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted">Ticket médio</span>
+                  <span className="font-semibold text-agtext">{fmtBRL(ticketMedio)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted">Vendas c/ valor</span>
+                  <span className="font-semibold text-agtext">{vendasComValor.length}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Recent leads */}
+        {/* Leads recentes */}
         <div className="card p-6 lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-agtext">Leads Recentes</h2>
@@ -273,16 +357,23 @@ export default function Dashboard() {
                     <p className="text-xs text-muted">{l.plano_interesse || 'Plano não informado'}</p>
                   </div>
                 </div>
-                <span
-                  className="badge text-xs"
-                  style={{
-                    background: `${STATUS_COLORS[l.status]}18`,
-                    color: STATUS_COLORS[l.status],
-                    border: `1px solid ${STATUS_COLORS[l.status]}30`,
-                  }}
-                >
-                  {l.status}
-                </span>
+                <div className="flex items-center gap-3">
+                  {l.status === 'Fechado' && l.valor_venda != null && (
+                    <span className="text-xs font-semibold text-emerald-400 hidden sm:block">
+                      {fmtBRL(l.valor_venda)}
+                    </span>
+                  )}
+                  <span
+                    className="badge text-xs"
+                    style={{
+                      background: `${STATUS_COLORS[l.status]}18`,
+                      color: STATUS_COLORS[l.status],
+                      border: `1px solid ${STATUS_COLORS[l.status]}30`,
+                    }}
+                  >
+                    {l.status}
+                  </span>
+                </div>
               </Link>
             ))}
           </div>
