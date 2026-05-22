@@ -162,7 +162,7 @@ export default function LeadDetail() {
           <InfoRow label="Objetivo"       value={lead.objetivo} />
           <InfoRow label="Canal"          value={lead.canal} />
           <InfoRow label="Plano"          value={lead.plano_interesse} />
-          <InfoRow label="Automação de interesse" value={lead.automacao_interesse || 'Não informado'} />
+          <InfoRow label="Automação" value={lead.automacao_interesse || 'Não informado'} />
           <InfoRow label="Criado em"      value={fmtDateTime(lead.data_criacao)} />
           <InfoRow label="Atualizado em"  value={fmtDateTime(lead.data_atualizacao)} />
         </div>
