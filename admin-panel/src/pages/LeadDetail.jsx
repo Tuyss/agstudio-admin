@@ -52,6 +52,7 @@ export default function LeadDetail() {
         supabase.from('lead_notas').select('*').eq('lead_id', id).order('criado_em', { ascending: false }),
         supabase.auth.getSession(),
       ])
+      console.log('[LeadDetail] lead do Supabase:', l)
       setLead(l)
       setNotas(n ?? [])
       const email = sessionData?.session?.user?.email ?? ''
